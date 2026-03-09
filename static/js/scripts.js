@@ -217,19 +217,61 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    onAuthStateChanged(auth, (user) => {
-        if(user) { 
-            // Cargar el último peso conocido para que la calculadora no esté en cero
-            const hRef = query(ref(db, `usuarios/${user.uid}/historial`), limitToLast(1));
-            onValue(hRef, (snap) => {
-                snap.forEach(c => { 
-                    document.getElementById('peso').value = c.val().peso;
-                    calcularMetricas();
-                });
+onAuthStateChanged(auth, (user) => {
+    if(user) { 
+        console.log("Usuario detectado:", user.email);
+        
+        // 1. Cargamos el historial visual
+        cargarHistorial(user.uid);
+        
+        // 2. Traemos el último peso para la calculadora
+        const hRef = query(ref(db, `usuarios/${user.uid}/historial`), limitToLast(1));
+        get(hRef).then((snap) => {
+            snap.forEach(c => { 
+                const ultimo = c.val();
+                document.getElementById('peso').value = ultimo.peso;
+                semanaActual = ultimo.semana || 1; // Recupera en qué semana se quedó
+                document.getElementById('semanaDisplay').innerText = "SEMANA " + semanaActual;
+                calcularMetricas();
             });
             window.renderRutina('fuerza');
-        } else { 
-            if (window.location.pathname !== "/login") window.location.href = "/login";
-        }
-    });
+        });
+
+    } else { 
+        if (window.location.pathname !== "/login") window.location.href = "/login";
+    }
 });
+function cargarHistorial(uid) {
+    console.log("Cargando historial para:", uid);
+    const historialRef = query(ref(db, `usuarios/${uid}/historial`), limitToLast(10));
+    
+    onValue(historialRef, (snapshot) => {
+        const lista = document.getElementById('listaHistorial');
+        if (!lista) return;
+
+        let html = "";
+        if (snapshot.exists()) {
+            const registros = [];
+            snapshot.forEach((child) => {
+                registros.push(child.val());
+            });
+            
+            // Los ordenamos para que el más nuevo aparezca arriba
+            registros.reverse().forEach(reg => {
+                const fechaHumana = new Date(reg.fecha).toLocaleDateString();
+                html += `
+                    <div class="historial-item" style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #333;">
+                        <span style="color:#2ecc71; font-weight:bold;">${reg.peso} kg</span>
+                        <span style="color:#888;">${fechaHumana}</span>
+                        <span style="color:#fff; font-size:0.8rem;">Semana ${reg.semana}</span>
+                    </div>`;
+            });
+            // Ocultamos el mensaje de "Sin registros" si hay datos
+            const alerta = document.getElementById('alertaRegistro');
+            if(alerta) alerta.style.display = "none";
+        } else {
+            html = "<p style='color:#666; padding:10px;'>Aún no hay registros de entrenamiento.</p>";
+        }
+        lista.innerHTML = html;
+    });
+}
