@@ -2,7 +2,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getDatabase, ref, push, set, onValue, query, limitToLast, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-// 1. CONFIGURACIÓN FIREBASE (Mantenemos tus credenciales)
 const firebaseConfig = {
     apiKey: "AIzaSyCNvIkCnzAX8rXQTXOW_N7pYkn9yxOv4HM",
     authDomain: "app-ejercicio-841f1.firebaseapp.com",
@@ -17,7 +16,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-// 2. PLAN TÁCTICO DE 16 SEMANAS
+// PLAN 16 SEMANAS
 const plan16Semanas = {
     1: { fuerza: ["Sentadillas", "Flexiones", "Estocadas", "Plancha"], cardio: ["Caminata 40 min"] },
     2: { fuerza: ["Sentadillas", "Flexiones", "Estocadas", "Plancha Abdominal"], cardio: ["Caminata 40 min"] },
@@ -37,7 +36,6 @@ const plan16Semanas = {
     16: { fuerza: ["Circuito Final Eva", "Máximas Reps", "Plancha al fallo"], cardio: ["Caminata 80 min"] }
 };
 
-// VARIABLES DE ESTADO
 let semanaActual = 1;
 let rutinaTipo = "fuerza";
 let progresoMemoria = { "fuerza": {}, "cardio": {} };
@@ -63,84 +61,72 @@ function calcularMetricas() {
     }
 }
 
-// --- LOGICA DE GUARDADO INTELIGENTE (PESO SEMANAL + AVANCE) ---
-async function guardarTodo() {
-    const user = auth.currentUser;
-    if(!user) return alert("Inicie sesión para guardar.");
-
-    // Verificamos el último peso en la base de datos
-    const historialRef = query(ref(db, `usuarios/${user.uid}/historial`), limitToLast(1));
-    
-    get(historialRef).then(async (snapshot) => {
-        let ultimoPeso = 0;
-        let ultimaFecha = 0;
-        
-        snapshot.forEach((child) => {
-            ultimoPeso = parseFloat(child.val().peso);
-            ultimaFecha = child.val().fecha;
-        });
-
-        const hoy = Date.now();
-        const unaSemanaMs = 7 * 24 * 60 * 60 * 1000;
-        let pesoFinal = ultimoPeso;
-
-        // Si es la primera vez o pasaron 7 días, pedimos peso
-        if (!ultimaFecha || (hoy - ultimaFecha > unaSemanaMs)) {
-            const nuevoPeso = prompt("🛡️ ZAPALA FIT: Día de Pesaje. Ingresá tu peso actual (kg):", ultimoPeso || "");
-            if (nuevoPeso && !isNaN(nuevoPeso)) {
-                pesoFinal = parseFloat(nuevoPeso);
-                document.getElementById('peso').value = pesoFinal;
-                calcularMetricas();
-            } else {
-                alert("Control de peso requerido para avanzar.");
-                return;
-            }
-        }
-
-        // Guardamos progreso
-        const imc = document.getElementById('imcBadge').innerText;
-        const nuevaEntradaRef = push(ref(db, `usuarios/${user.uid}/historial`));
-        
-        await set(nuevaEntradaRef, {
-            peso: pesoFinal,
-            imc: imc,
-            agua: litrosAgua,
-            semana: semanaActual,
-            fecha: hoy,
-            completado: true
-        });
-
-        // Notificar al servidor Python para el mail
-        fetch('/api/notificar', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ peso: pesoFinal, imc, semana: semanaActual, agua: litrosAgua })
-        });
-
-        festejarYAvance();
+// --- HISTORIAL VISUAL ---
+function cargarHistorial(uid) {
+    const historialRef = query(ref(db, `usuarios/${uid}/historial`), limitToLast(10));
+    onValue(historialRef, (snapshot) => {
+        const lista = document.getElementById('listaHistorial');
+        if (!lista) return;
+        let html = "";
+        if (snapshot.exists()) {
+            const regs = [];
+            snapshot.forEach(c => regs.push(c.val()));
+            regs.reverse().forEach(r => {
+                const f = new Date(r.fecha).toLocaleDateString();
+                html += `<div class="hist-row"><span>${f}</span><b>${r.peso}kg</b><small>Sem ${r.semana}</small></div>`;
+            });
+        } else { html = "<p>Sin registros.</p>"; }
+        lista.innerHTML = html;
     });
 }
 
-function festejarYAvance() {
-    // 1. Mensaje Motivador
-    alert("¡MISIÓN CUMPLIDA! 💪\nEntrenamiento registrado correctamente.\n\nPreparando objetivos para la siguiente etapa...");
-    
-    // 2. Avance de semana automático
-    if (semanaActual < 16) {
-        semanaActual++;
-        window.cambiarSemana(semanaActual);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+// --- GUARDADO INTELIGENTE ---
+async function guardarTodo() {
+    const user = auth.currentUser;
+    if(!user) return;
+
+    const hRef = query(ref(db, `usuarios/${user.uid}/historial`), limitToLast(1));
+    get(hRef).then(async (snap) => {
+        let uPeso = 0, uFecha = 0;
+        snap.forEach(c => { uPeso = c.val().peso; uFecha = c.val().fecha; });
+
+        const hoy = Date.now();
+        let pesoFinal = uPeso;
+
+        if (!uFecha || (hoy - uFecha > (7 * 24 * 60 * 60 * 1000))) {
+            const nPeso = prompt("REGISTRO SEMANAL: Ingresá tu peso actual:", uPeso || "");
+            if (nPeso && !isNaN(nPeso)) { pesoFinal = parseFloat(nPeso); }
+            else { alert("Peso requerido."); return; }
+        }
+
+        const imc = document.getElementById('imcBadge').innerText;
+        await set(push(ref(db, `usuarios/${user.uid}/historial`)), {
+            peso: pesoFinal, imc, agua: litrosAgua, semana: semanaActual, fecha: hoy
+        });
+
+        alert("¡EXCELENTE! Semana " + semanaActual + " completada.");
+        if(semanaActual < 16) { 
+            semanaActual++; 
+            window.cambiarSemana(semanaActual); 
+        }
+    });
+}
+
+// --- BORRAR TODO ---
+async function borrarHistorial() {
+    const user = auth.currentUser;
+    if(user && confirm("¿Borrar todo tu progreso?") && prompt("Escribe BORRAR") === "BORRAR") {
+        await set(ref(db, `usuarios/${user.uid}/historial`), null);
+        location.reload();
     }
 }
 
-// --- CRONÓMETRO ---
+// --- CRONOMETRO ---
 window.ajustarTimer = (s) => { if(!corriendo) { tiempoRestante = Math.max(10, tiempoRestante + s); tiempoTotal = tiempoRestante; actualizarDisplay(); }};
 function actualizarDisplay() {
-    const m = Math.floor(tiempoRestante / 60);
-    const s = tiempoRestante % 60;
+    const m = Math.floor(tiempoRestante / 60), s = tiempoRestante % 60;
     document.getElementById('timerDisplay').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-    const offset = 283 - (283 * tiempoRestante) / tiempoTotal;
-    document.getElementById('progresoReloj').style.strokeDashoffset = offset;
+    document.getElementById('progresoReloj').style.strokeDashoffset = 283 - (283 * tiempoRestante) / tiempoTotal;
 }
 window.toggleTimer = () => {
     const btn = document.getElementById('btnStartTimer');
@@ -150,9 +136,9 @@ window.toggleTimer = () => {
         timerInterval = setInterval(() => {
             tiempoRestante--; actualizarDisplay();
             if(tiempoRestante <= 0) { 
-                clearInterval(timerInterval); corriendo = false; btn.innerHTML = '<i class="fas fa-play"></i>';
-                if("vibrate" in navigator) navigator.vibrate([1000, 200, 1000]);
-                alert("¡Descanso terminado!"); tiempoRestante = tiempoTotal; actualizarDisplay();
+                clearInterval(timerInterval); alert("Descanso terminado!"); 
+                tiempoRestante = tiempoTotal; corriendo = false; btn.innerHTML = '<i class="fas fa-play"></i>';
+                actualizarDisplay();
             }
         }, 1000);
     }
@@ -162,116 +148,48 @@ window.toggleTimer = () => {
 window.cambiarSemana = (n) => { 
     semanaActual = n; 
     document.getElementById('semanaDisplay').innerText = "SEMANA " + n;
-    progresoMemoria = {"fuerza":{}, "cardio":{}}; 
     window.renderRutina(rutinaTipo); 
 };
-
 window.renderRutina = (tipo) => {
     rutinaTipo = tipo;
     const lista = document.getElementById('listaEjercicios');
-    if (!lista) return;
-    const ejercicios = plan16Semanas[semanaActual][tipo];
-    let html = "";
-    ejercicios.forEach(ej => {
-        const id = `sem${semanaActual}_${tipo}_${ej}`;
-        const check = (progresoMemoria[tipo] && progresoMemoria[tipo][id]) ? "checked" : "";
-        html += `<div class="ejercicio-row"><label>${ej}</label><input type="checkbox" onclick="window.toggleEj('${tipo}','${id}')" ${check}></div>`;
-    });
-    lista.innerHTML = html;
-    actualizarBarra();
+    const ejs = plan16Semanas[semanaActual][tipo];
+    lista.innerHTML = ejs.map(ej => `<div class="ej-item"><span>${ej}</span><input type="checkbox" onclick="window.updateBar()"></div>`).join('');
+    window.updateBar();
+};
+window.updateBar = () => {
+    const total = document.querySelectorAll('#listaEjercicios input').length;
+    const check = document.querySelectorAll('#listaEjercicios input:checked').length;
+    const p = Math.round((check/total)*100) || 0;
+    document.getElementById('barraRelleno').style.width = p + "%";
+    document.getElementById('porcentajeProgreso').innerText = p + "%";
 };
 
-window.toggleEj = (t, id) => { 
-    if(!progresoMemoria[t]) progresoMemoria[t] = {};
-    progresoMemoria[t][id] = !progresoMemoria[t][id]; 
-    actualizarBarra(); 
-};
+// --- AGUA ---
+window.sumarAgua = () => { litrosAgua += 0.25; document.getElementById('aguaContador').innerText = litrosAgua.toFixed(2) + " L"; };
 
-function actualizarBarra() {
-    const ejercicios = plan16Semanas[semanaActual][rutinaTipo];
-    const marcados = Object.values(progresoMemoria[rutinaTipo] || {}).filter(v => v).length;
-    const porc = Math.round((marcados / ejercicios.length) * 100);
-    document.getElementById('barraRelleno').style.width = porc + "%";
-    document.getElementById('porcentajeProgreso').innerText = porc + "%";
-}
-
-// --- HIDRATACIÓN ---
-window.sumarAgua = () => { litrosAgua = parseFloat((litrosAgua + 0.25).toFixed(2)); document.getElementById('aguaContador').innerText = `${litrosAgua} L`; };
-
-// --- INICIALIZACIÓN ---
+// --- INIT ---
 document.addEventListener('DOMContentLoaded', () => {
     ['peso','altura','edad','sexo','actividad','intensidadDeficit'].forEach(id => {
-        const el = document.getElementById(id);
-        if(el) el.addEventListener('input', calcularMetricas);
+        document.getElementById(id).addEventListener('input', calcularMetricas);
     });
-
     document.getElementById('btnGuardar').onclick = guardarTodo;
+    document.getElementById('btnBorrarTodo').onclick = borrarHistorial;
+    document.getElementById('btnLogout').onclick = () => signOut(auth).then(() => window.location.href="/logout");
 
-    const btnL = document.getElementById('btnLogout');
-    if(btnL) {
-        btnL.onclick = async () => {
-            if(confirm("¿Poner sistema en STANDBY?")) {
-                await signOut(auth);
-                window.location.href = "/logout";
-            }
-        };
-    }
-
-onAuthStateChanged(auth, (user) => {
-    if(user) { 
-        console.log("Usuario detectado:", user.email);
-        
-        // 1. Cargamos el historial visual
-        cargarHistorial(user.uid);
-        
-        // 2. Traemos el último peso para la calculadora
-        const hRef = query(ref(db, `usuarios/${user.uid}/historial`), limitToLast(1));
-        get(hRef).then((snap) => {
-            snap.forEach(c => { 
-                const ultimo = c.val();
-                document.getElementById('peso').value = ultimo.peso;
-                semanaActual = ultimo.semana || 1; // Recupera en qué semana se quedó
-                document.getElementById('semanaDisplay').innerText = "SEMANA " + semanaActual;
-                calcularMetricas();
+    onAuthStateChanged(auth, (user) => {
+        if(user) {
+            document.getElementById('userDisplay').innerText = "OPERATIVO: " + user.email.split('@')[0].toUpperCase();
+            cargarHistorial(user.uid);
+            get(query(ref(db, `usuarios/${user.uid}/historial`), limitToLast(1))).then(s => {
+                s.forEach(c => {
+                    document.getElementById('peso').value = c.val().peso;
+                    semanaActual = c.val().semana || 1;
+                    window.cambiarSemana(semanaActual);
+                    calcularMetricas();
+                });
             });
             window.renderRutina('fuerza');
-        });
-
-    } else { 
-        if (window.location.pathname !== "/login") window.location.href = "/login";
-    }
-});
-function cargarHistorial(uid) {
-    console.log("Cargando historial para:", uid);
-    const historialRef = query(ref(db, `usuarios/${uid}/historial`), limitToLast(10));
-    
-    onValue(historialRef, (snapshot) => {
-        const lista = document.getElementById('listaHistorial');
-        if (!lista) return;
-
-        let html = "";
-        if (snapshot.exists()) {
-            const registros = [];
-            snapshot.forEach((child) => {
-                registros.push(child.val());
-            });
-            
-            // Los ordenamos para que el más nuevo aparezca arriba
-            registros.reverse().forEach(reg => {
-                const fechaHumana = new Date(reg.fecha).toLocaleDateString();
-                html += `
-                    <div class="historial-item" style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #333;">
-                        <span style="color:#2ecc71; font-weight:bold;">${reg.peso} kg</span>
-                        <span style="color:#888;">${fechaHumana}</span>
-                        <span style="color:#fff; font-size:0.8rem;">Semana ${reg.semana}</span>
-                    </div>`;
-            });
-            // Ocultamos el mensaje de "Sin registros" si hay datos
-            const alerta = document.getElementById('alertaRegistro');
-            if(alerta) alerta.style.display = "none";
-        } else {
-            html = "<p style='color:#666; padding:10px;'>Aún no hay registros de entrenamiento.</p>";
-        }
-        lista.innerHTML = html;
+        } else { window.location.href = "/login"; }
     });
-}
+});
