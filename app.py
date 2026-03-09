@@ -10,7 +10,7 @@ app.secret_key = 'zapala_seguro_2026_fit'
 # --- CONFIGURACIÓN DE CORREO ---
 MAIL_EMISOR = "comprovendoneuquen@gmail.com" 
 MAIL_PASSWORD = "crdw zxaj qnln mixr" 
-MAIL_DESTINO = "comprovendoneuquen@gmail"
+MAIL_DESTINO = "comprovendoneuquen@gmail.com"
 
 def enviar_correo_motivador(datos):
     try:
