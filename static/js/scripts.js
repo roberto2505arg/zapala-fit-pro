@@ -1,8 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getDatabase, ref, push, set, onValue, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getDatabase, ref, push, set, onValue, query, limitToLast, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-// 1. CONFIGURACIÓN FIREBASE
+// 1. CONFIGURACIÓN FIREBASE (Mantenemos tus credenciales)
 const firebaseConfig = {
     apiKey: "AIzaSyCNvIkCnzAX8rXQTXOW_N7pYkn9yxOv4HM",
     authDomain: "app-ejercicio-841f1.firebaseapp.com",
@@ -17,7 +17,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-// 2. PLAN DE 16 SEMANAS
+// 2. PLAN TÁCTICO DE 16 SEMANAS
 const plan16Semanas = {
     1: { fuerza: ["Sentadillas", "Flexiones", "Estocadas", "Plancha"], cardio: ["Caminata 40 min"] },
     2: { fuerza: ["Sentadillas", "Flexiones", "Estocadas", "Plancha Abdominal"], cardio: ["Caminata 40 min"] },
@@ -44,7 +44,7 @@ let progresoMemoria = { "fuerza": {}, "cardio": {} };
 let litrosAgua = 0;
 let timerInterval, tiempoRestante = 30, tiempoTotal = 30, corriendo = false;
 
-// --- FUNCIONES DE CALCULADORA ---
+// --- CALCULADORA ---
 function calcularMetricas() {
     const peso = parseFloat(document.getElementById('peso').value) || 0;
     const altura = parseFloat(document.getElementById('altura').value) || 0;
@@ -63,7 +63,77 @@ function calcularMetricas() {
     }
 }
 
-// --- FUNCIONES DEL CRONÓMETRO ---
+// --- LOGICA DE GUARDADO INTELIGENTE (PESO SEMANAL + AVANCE) ---
+async function guardarTodo() {
+    const user = auth.currentUser;
+    if(!user) return alert("Inicie sesión para guardar.");
+
+    // Verificamos el último peso en la base de datos
+    const historialRef = query(ref(db, `usuarios/${user.uid}/historial`), limitToLast(1));
+    
+    get(historialRef).then(async (snapshot) => {
+        let ultimoPeso = 0;
+        let ultimaFecha = 0;
+        
+        snapshot.forEach((child) => {
+            ultimoPeso = parseFloat(child.val().peso);
+            ultimaFecha = child.val().fecha;
+        });
+
+        const hoy = Date.now();
+        const unaSemanaMs = 7 * 24 * 60 * 60 * 1000;
+        let pesoFinal = ultimoPeso;
+
+        // Si es la primera vez o pasaron 7 días, pedimos peso
+        if (!ultimaFecha || (hoy - ultimaFecha > unaSemanaMs)) {
+            const nuevoPeso = prompt("🛡️ ZAPALA FIT: Día de Pesaje. Ingresá tu peso actual (kg):", ultimoPeso || "");
+            if (nuevoPeso && !isNaN(nuevoPeso)) {
+                pesoFinal = parseFloat(nuevoPeso);
+                document.getElementById('peso').value = pesoFinal;
+                calcularMetricas();
+            } else {
+                alert("Control de peso requerido para avanzar.");
+                return;
+            }
+        }
+
+        // Guardamos progreso
+        const imc = document.getElementById('imcBadge').innerText;
+        const nuevaEntradaRef = push(ref(db, `usuarios/${user.uid}/historial`));
+        
+        await set(nuevaEntradaRef, {
+            peso: pesoFinal,
+            imc: imc,
+            agua: litrosAgua,
+            semana: semanaActual,
+            fecha: hoy,
+            completado: true
+        });
+
+        // Notificar al servidor Python para el mail
+        fetch('/api/notificar', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ peso: pesoFinal, imc, semana: semanaActual, agua: litrosAgua })
+        });
+
+        festejarYAvance();
+    });
+}
+
+function festejarYAvance() {
+    // 1. Mensaje Motivador
+    alert("¡MISIÓN CUMPLIDA! 💪\nEntrenamiento registrado correctamente.\n\nPreparando objetivos para la siguiente etapa...");
+    
+    // 2. Avance de semana automático
+    if (semanaActual < 16) {
+        semanaActual++;
+        window.cambiarSemana(semanaActual);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+}
+
+// --- CRONÓMETRO ---
 window.ajustarTimer = (s) => { if(!corriendo) { tiempoRestante = Math.max(10, tiempoRestante + s); tiempoTotal = tiempoRestante; actualizarDisplay(); }};
 function actualizarDisplay() {
     const m = Math.floor(tiempoRestante / 60);
@@ -82,18 +152,22 @@ window.toggleTimer = () => {
             if(tiempoRestante <= 0) { 
                 clearInterval(timerInterval); corriendo = false; btn.innerHTML = '<i class="fas fa-play"></i>';
                 if("vibrate" in navigator) navigator.vibrate([1000, 200, 1000]);
-                alert("¡Tiempo Cumplido!"); tiempoRestante = tiempoTotal; actualizarDisplay();
+                alert("¡Descanso terminado!"); tiempoRestante = tiempoTotal; actualizarDisplay();
             }
         }, 1000);
     }
 };
 
-// --- GESTIÓN DE RUTINA ---
-window.cambiarSemana = (n) => { semanaActual = n; progresoMemoria = {"fuerza":{}, "cardio":{}}; window.renderRutina(rutinaTipo); };
+// --- RUTINAS ---
+window.cambiarSemana = (n) => { 
+    semanaActual = n; 
+    document.getElementById('semanaDisplay').innerText = "SEMANA " + n;
+    progresoMemoria = {"fuerza":{}, "cardio":{}}; 
+    window.renderRutina(rutinaTipo); 
+};
+
 window.renderRutina = (tipo) => {
     rutinaTipo = tipo;
-    document.getElementById('tabFuerza').classList.toggle('active', tipo === 'fuerza');
-    document.getElementById('tabCardio').classList.toggle('active', tipo === 'cardio');
     const lista = document.getElementById('listaEjercicios');
     if (!lista) return;
     const ejercicios = plan16Semanas[semanaActual][tipo];
@@ -103,63 +177,28 @@ window.renderRutina = (tipo) => {
         const check = (progresoMemoria[tipo] && progresoMemoria[tipo][id]) ? "checked" : "";
         html += `<div class="ejercicio-row"><label>${ej}</label><input type="checkbox" onclick="window.toggleEj('${tipo}','${id}')" ${check}></div>`;
     });
-    lista.innerHTML = html; actualizarBarra();
+    lista.innerHTML = html;
+    actualizarBarra();
 };
+
 window.toggleEj = (t, id) => { 
     if(!progresoMemoria[t]) progresoMemoria[t] = {};
     progresoMemoria[t][id] = !progresoMemoria[t][id]; 
     actualizarBarra(); 
 };
+
 function actualizarBarra() {
     const ejercicios = plan16Semanas[semanaActual][rutinaTipo];
-    const total = ejercicios.length;
     const marcados = Object.values(progresoMemoria[rutinaTipo] || {}).filter(v => v).length;
-    const porc = Math.round((marcados / total) * 100);
+    const porc = Math.round((marcados / ejercicios.length) * 100);
     document.getElementById('barraRelleno').style.width = porc + "%";
     document.getElementById('porcentajeProgreso').innerText = porc + "%";
 }
 
-// --- HIDRATACIÓN Y GUARDADO ---
+// --- HIDRATACIÓN ---
 window.sumarAgua = () => { litrosAgua = parseFloat((litrosAgua + 0.25).toFixed(2)); document.getElementById('aguaContador').innerText = `${litrosAgua} L`; };
 
-async function guardarTodo() {
-    const user = auth.currentUser;
-    if(!user) return alert("Debe iniciar sesión para guardar");
-
-    const peso = document.getElementById('peso').value;
-    const imc = document.getElementById('imcBadge').innerText;
-    if(!peso) return alert("Cargá el peso antes de finalizar");
-
-    // Guardar en la carpeta específica del usuario
-    const nuevoRef = push(ref(db, `usuarios/${user.uid}/historial`));
-    set(nuevoRef, { peso, imc, agua: litrosAgua, semana: semanaActual, fecha: Date.now() })
-    .then(() => {
-        fetch('/api/notificar', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ peso, imc, semana: semanaActual, agua: litrosAgua })
-        }).then(() => alert("¡Datos guardados y reporte enviado!"));
-    });
-}
-
-function cargarHistorial(uid) {
-    const historialRef = query(ref(db, `usuarios/${uid}/historial`), limitToLast(5));
-    onValue(historialRef, (snapshot) => {
-        const data = snapshot.val();
-        let html = "";
-        if (data) {
-            const registros = Object.values(data).sort((a, b) => b.fecha - a.fecha);
-            registros.forEach(d => {
-                html += `<div class="historial-item"><span>${d.peso}kg</span><span>IMC: ${d.imc}</span></div>`;
-            });
-            document.getElementById('alertaRegistro').style.display = "none";
-        } else {
-            document.getElementById('alertaRegistro').style.display = "block";
-        }
-        document.getElementById('listaHistorial').innerHTML = html || "<p>Sin registros aún</p>";
-    });
-}
-
-// --- INICIALIZACIÓN Y SEGURIDAD ---
+// --- INICIALIZACIÓN ---
 document.addEventListener('DOMContentLoaded', () => {
     ['peso','altura','edad','sexo','actividad','intensidadDeficit'].forEach(id => {
         const el = document.getElementById(id);
@@ -172,23 +211,25 @@ document.addEventListener('DOMContentLoaded', () => {
     if(btnL) {
         btnL.onclick = async () => {
             if(confirm("¿Poner sistema en STANDBY?")) {
-                try {
-                    await signOut(auth);
-                    window.location.href = "/logout";
-                } catch (e) { console.error("Error al salir:", e); }
+                await signOut(auth);
+                window.location.href = "/logout";
             }
         };
     }
 
     onAuthStateChanged(auth, (user) => {
         if(user) { 
-            console.log("Sesión activa:", user.email);
-            cargarHistorial(user.uid);
+            // Cargar el último peso conocido para que la calculadora no esté en cero
+            const hRef = query(ref(db, `usuarios/${user.uid}/historial`), limitToLast(1));
+            onValue(hRef, (snap) => {
+                snap.forEach(c => { 
+                    document.getElementById('peso').value = c.val().peso;
+                    calcularMetricas();
+                });
+            });
             window.renderRutina('fuerza');
         } else { 
-            if (window.location.pathname !== "/login") {
-                window.location.href = "/login";
-            }
+            if (window.location.pathname !== "/login") window.location.href = "/login";
         }
     });
 });
