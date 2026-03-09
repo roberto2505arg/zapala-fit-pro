@@ -2,6 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getDatabase, ref, push, set, onValue, query, limitToLast, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
+// 1. CONFIGURACIÓN FIREBASE
 const firebaseConfig = {
     apiKey: "AIzaSyCNvIkCnzAX8rXQTXOW_N7pYkn9yxOv4HM",
     authDomain: "app-ejercicio-841f1.firebaseapp.com",
@@ -16,7 +17,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-// PLAN 16 SEMANAS
+// 2. PLAN TÁCTICO DE 16 SEMANAS
 const plan16Semanas = {
     1: { fuerza: ["Sentadillas", "Flexiones", "Estocadas", "Plancha"], cardio: ["Caminata 40 min"] },
     2: { fuerza: ["Sentadillas", "Flexiones", "Estocadas", "Plancha Abdominal"], cardio: ["Caminata 40 min"] },
@@ -36,6 +37,7 @@ const plan16Semanas = {
     16: { fuerza: ["Circuito Final Eva", "Máximas Reps", "Plancha al fallo"], cardio: ["Caminata 80 min"] }
 };
 
+// VARIABLES DE ESTADO
 let semanaActual = 1;
 let rutinaTipo = "fuerza";
 let progresoMemoria = { "fuerza": {}, "cardio": {} };
@@ -73,18 +75,33 @@ function cargarHistorial(uid) {
             snapshot.forEach(c => regs.push(c.val()));
             regs.reverse().forEach(r => {
                 const f = new Date(r.fecha).toLocaleDateString();
-                html += `<div class="hist-row"><span>${f}</span><b>${r.peso}kg</b><small>Sem ${r.semana}</small></div>`;
+                html += `<div class="hist-row" style="display:flex; justify-content:space-between; border-bottom:1px solid #333; padding:5px;">
+                            <span>${f}</span><b>${r.peso}kg</b><small>Sem ${r.semana}</small>
+                         </div>`;
             });
-        } else { html = "<p>Sin registros.</p>"; }
+        } else { html = "<p>Sin registros aún.</p>"; }
         lista.innerHTML = html;
     });
 }
 
-// --- GUARDADO INTELIGENTE ---
+// --- GUARDADO ESTRICTO (BLOQUEO SI NO COMPLETA TODO) ---
 async function guardarTodo() {
     const user = auth.currentUser;
     if(!user) return;
 
+    // VALIDACIÓN: ¿Están todos los checks de AMBOS tipos?
+    const ejsFuerza = plan16Semanas[semanaActual].fuerza;
+    const ejsCardio = plan16Semanas[semanaActual].cardio;
+    
+    const hechosFuerza = Object.values(progresoMemoria.fuerza || {}).filter(v => v).length;
+    const hechosCardio = Object.values(progresoMemoria.cardio || {}).filter(v => v).length;
+
+    if (hechosFuerza < ejsFuerza.length || hechosCardio < ejsCardio.length) {
+        alert("⚠️ OBJETIVOS INCOMPLETOS\nDebes terminar todos los ejercicios de FUERZA y CARDIO para avanzar.");
+        return; 
+    }
+
+    // SI COMPLETO TODO, PROCEDE AL PESAJE
     const hRef = query(ref(db, `usuarios/${user.uid}/historial`), limitToLast(1));
     get(hRef).then(async (snap) => {
         let uPeso = 0, uFecha = 0;
@@ -94,25 +111,26 @@ async function guardarTodo() {
         let pesoFinal = uPeso;
 
         if (!uFecha || (hoy - uFecha > (7 * 24 * 60 * 60 * 1000))) {
-            const nPeso = prompt("REGISTRO SEMANAL: Ingresá tu peso actual:", uPeso || "");
+            const nPeso = prompt("🛡️ REGISTRO SEMANAL: Ingresá tu peso actual para cerrar la etapa:", uPeso || "");
             if (nPeso && !isNaN(nPeso)) { pesoFinal = parseFloat(nPeso); }
             else { alert("Peso requerido."); return; }
         }
 
         const imc = document.getElementById('imcBadge').innerText;
         await set(push(ref(db, `usuarios/${user.uid}/historial`)), {
-            peso: pesoFinal, imc, agua: litrosAgua, semana: semanaActual, fecha: hoy
+            peso: pesoFinal, imc, agua: litrosAgua, semana: semanaActual, fecha: hoy, status: "COMPLETO"
         });
 
-        alert("¡EXCELENTE! Semana " + semanaActual + " completada.");
+        alert("¡EXCELENTE! Semana " + semanaActual + " completada al 100%.");
         if(semanaActual < 16) { 
             semanaActual++; 
             window.cambiarSemana(semanaActual); 
+            progresoMemoria = { "fuerza": {}, "cardio": {} }; // Resetea para la nueva semana
         }
     });
 }
 
-// --- BORRAR TODO ---
+// --- BORRAR HISTORIAL ---
 async function borrarHistorial() {
     const user = auth.currentUser;
     if(user && confirm("¿Borrar todo tu progreso?") && prompt("Escribe BORRAR") === "BORRAR") {
@@ -121,7 +139,7 @@ async function borrarHistorial() {
     }
 }
 
-// --- CRONOMETRO ---
+// --- CRONÓMETRO ---
 window.ajustarTimer = (s) => { if(!corriendo) { tiempoRestante = Math.max(10, tiempoRestante + s); tiempoTotal = tiempoRestante; actualizarDisplay(); }};
 function actualizarDisplay() {
     const m = Math.floor(tiempoRestante / 60), s = tiempoRestante % 60;
@@ -136,7 +154,7 @@ window.toggleTimer = () => {
         timerInterval = setInterval(() => {
             tiempoRestante--; actualizarDisplay();
             if(tiempoRestante <= 0) { 
-                clearInterval(timerInterval); alert("Descanso terminado!"); 
+                clearInterval(timerInterval); alert("¡Descanso terminado!"); 
                 tiempoRestante = tiempoTotal; corriendo = false; btn.innerHTML = '<i class="fas fa-play"></i>';
                 actualizarDisplay();
             }
@@ -150,17 +168,38 @@ window.cambiarSemana = (n) => {
     document.getElementById('semanaDisplay').innerText = "SEMANA " + n;
     window.renderRutina(rutinaTipo); 
 };
+
 window.renderRutina = (tipo) => {
     rutinaTipo = tipo;
     const lista = document.getElementById('listaEjercicios');
     const ejs = plan16Semanas[semanaActual][tipo];
-    lista.innerHTML = ejs.map(ej => `<div class="ej-item"><span>${ej}</span><input type="checkbox" onclick="window.updateBar()"></div>`).join('');
+    
+    // Cambia la clase activa en los botones
+    document.querySelectorAll('.btn-tipo').forEach(b => b.classList.remove('active'));
+    event?.target?.classList?.add('active');
+
+    lista.innerHTML = ejs.map(ej => {
+        const id = `sem${semanaActual}_${tipo}_${ej}`;
+        const check = (progresoMemoria[tipo] && progresoMemoria[tipo][id]) ? "checked" : "";
+        return `<div class="ejercicio-row" style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <span>${ej}</span>
+                    <input type="checkbox" onclick="window.toggleEj('${tipo}','${ej}')" ${check}>
+                </div>`;
+    }).join('');
     window.updateBar();
 };
+
+window.toggleEj = (tipo, ejNombre) => {
+    const id = `sem${semanaActual}_${tipo}_${ejNombre}`;
+    if (!progresoMemoria[tipo]) progresoMemoria[tipo] = {};
+    progresoMemoria[tipo][id] = !progresoMemoria[tipo][id];
+    window.updateBar();
+};
+
 window.updateBar = () => {
-    const total = document.querySelectorAll('#listaEjercicios input').length;
-    const check = document.querySelectorAll('#listaEjercicios input:checked').length;
-    const p = Math.round((check/total)*100) || 0;
+    const totalEjs = plan16Semanas[semanaActual][rutinaTipo].length;
+    const marcados = Object.values(progresoMemoria[rutinaTipo] || {}).filter(v => v).length;
+    const p = Math.round((marcados/totalEjs)*100) || 0;
     document.getElementById('barraRelleno').style.width = p + "%";
     document.getElementById('porcentajeProgreso').innerText = p + "%";
 };
@@ -168,11 +207,13 @@ window.updateBar = () => {
 // --- AGUA ---
 window.sumarAgua = () => { litrosAgua += 0.25; document.getElementById('aguaContador').innerText = litrosAgua.toFixed(2) + " L"; };
 
-// --- INIT ---
+// --- INICIALIZACIÓN ---
 document.addEventListener('DOMContentLoaded', () => {
     ['peso','altura','edad','sexo','actividad','intensidadDeficit'].forEach(id => {
-        document.getElementById(id).addEventListener('input', calcularMetricas);
+        const el = document.getElementById(id);
+        if(el) el.addEventListener('input', calcularMetricas);
     });
+
     document.getElementById('btnGuardar').onclick = guardarTodo;
     document.getElementById('btnBorrarTodo').onclick = borrarHistorial;
     document.getElementById('btnLogout').onclick = () => signOut(auth).then(() => window.location.href="/logout");
@@ -181,15 +222,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if(user) {
             document.getElementById('userDisplay').innerText = "OPERATIVO: " + user.email.split('@')[0].toUpperCase();
             cargarHistorial(user.uid);
+            
+            // Cargar datos del último registro
             get(query(ref(db, `usuarios/${user.uid}/historial`), limitToLast(1))).then(s => {
                 s.forEach(c => {
-                    document.getElementById('peso').value = c.val().peso;
-                    semanaActual = c.val().semana || 1;
+                    const data = c.val();
+                    document.getElementById('peso').value = data.peso;
+                    semanaActual = data.semana || 1;
                     window.cambiarSemana(semanaActual);
                     calcularMetricas();
                 });
             });
             window.renderRutina('fuerza');
-        } else { window.location.href = "/login"; }
+        } else { 
+            if (window.location.pathname !== "/login") window.location.href = "/login";
+        }
     });
 });
