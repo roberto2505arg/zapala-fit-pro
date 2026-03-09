@@ -1,0 +1,15 @@
+{
+  "name": "Zapala Fit Pro",
+  "short_name": "ZapalaFit",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a1a",
+  "theme_color": "#2ecc71",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3043/3043206.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

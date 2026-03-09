@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Zapala Fit - Acceso</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        body { background: #0a0a0a; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: 'Roboto', sans-serif; }
+        .login-card { width: 90%; max-width: 360px; padding: 30px; background: #151515; border: 1px solid #2ecc71; border-radius: 20px; text-align: center; box-shadow: 0 0 30px rgba(46, 204, 113, 0.1); }
+        .logo-font { font-family: 'Orbitron', sans-serif; color: white; letter-spacing: 3px; margin-bottom: 25px; }
+        .logo-font span { color: #2ecc71; }
+        
+        .input-tactico { width: 100%; background: #000; border: 1px solid #333; padding: 12px; margin-bottom: 15px; border-radius: 8px; color: #2ecc71; font-family: 'Orbitron', sans-serif; font-size: 0.8rem; outline: none; transition: 0.3s; }
+        .input-tactico:focus { border-color: #2ecc71; box-shadow: 0 0 10px rgba(46, 204, 113, 0.3); }
+        
+        .btn-accion { width: 100%; padding: 15px; background: #2ecc71; border: none; border-radius: 8px; font-family: 'Orbitron', sans-serif; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+        .btn-accion:active { transform: scale(0.95); }
+        
+        .toggle-link { color: #888; font-size: 0.8rem; margin-top: 20px; cursor: pointer; display: block; text-decoration: underline; }
+        .toggle-link:hover { color: #2ecc71; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <h2 class="logo-font">ZAPALA<span>FIT</span></h2>
+    
+    <div id="auth-box">
+        <h3 id="auth-title" style="color: #888; font-family: 'Orbitron'; font-size: 0.9rem; margin-bottom: 20px;">MODO: INGRESO</h3>
+        
+        <input type="email" id="email" class="input-tactico" placeholder="EMAIL_USUARIO">
+        <input type="password" id="pass" class="input-tactico" placeholder="PASSWORD">
+        
+        <button id="btnPrincipal" class="btn-accion">EJECUTAR ACCESO</button>
+        
+        <span id="toggleAuth" class="toggle-link">¿No tienes cuenta? Registrar nuevo usuario</span>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyCNvIkCnzAX8rXQTXOW_N7pYkn9yxOv4HM",
+        authDomain: "app-ejercicio-841f1.firebaseapp.com",
+        projectId: "app-ejercicio-841f1",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    let esRegistro = false;
+
+    // Cambiar entre Login y Registro
+    document.getElementById('toggleAuth').onclick = () => {
+        esRegistro = !esRegistro;
+        document.getElementById('auth-title').innerText = esRegistro ? "MODO: REGISTRO" : "MODO: INGRESO";
+        document.getElementById('btnPrincipal').innerText = esRegistro ? "CREAR CUENTA" : "EJECUTAR ACCESO";
+        document.getElementById('toggleAuth').innerText = esRegistro ? "Ya tengo cuenta, volver al ingreso" : "¿No tienes cuenta? Registrar nuevo usuario";
+    };
+
+    document.getElementById('btnPrincipal').onclick = async () => {
+        const email = document.getElementById('email').value;
+        const pass = document.getElementById('pass').value;
+
+        if(!email || !pass) return alert("Complete los campos tácticos.");
+
+        try {
+            if (esRegistro) {
+                // REGISTRAR NUEVO USUARIO
+                await createUserWithEmailAndPassword(auth, email, pass);
+                alert("Cuenta creada con éxito. Iniciando sistema...");
+            } else {
+                // LOGIN NORMAL
+                await signInWithEmailAndPassword(auth, email, pass);
+            }
+            
+            // Avisar a Python y entrar
+            await fetch('/login', { method: 'POST' });
+            window.location.href = '/';
+        } catch (error) {
+            console.error(error);
+            alert("ERROR_DE_ACCESO: Verifique sus credenciales.");
+        }
+    };
+</script>
+
+</body>
+</html>

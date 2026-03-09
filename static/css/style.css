@@ -1,0 +1,231 @@
+:root {
+    --primary: #2ecc71;
+    --dark: #1a1a1a;
+    --card: #2d2d2d;
+    --text: #ffffff;
+}
+
+body {
+    background-color: var(--dark);
+    color: var(--text);
+    font-family: 'Roboto', sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+}
+
+.app-container {
+    width: 100%;
+    max-width: 500px;
+    padding: 15px;
+    box-sizing: border-box;
+}
+
+/* Header */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #444;
+}
+
+.logo-area h1 { font-size: 1.2rem; margin: 0; }
+.logo-area span { color: var(--primary); }
+
+.btn-standby {
+    background: none;
+    border: 1px solid #ff4444;
+    color: #ff4444;
+    padding: 8px 12px;
+    border-radius: 5px;
+}
+
+/* Tarjetas */
+.card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 15px;
+    margin: 15px 0;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+/* Selector de Semana */
+.seccion-semana {
+    margin: 10px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+select {
+    background: var(--card);
+    color: white;
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid var(--primary);
+    flex-grow: 1;
+}
+
+/* Inputs */
+.input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+input {
+    background: #3d3d3d;
+    border: none;
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Hidratación */
+.agua-card { text-align: center; }
+.agua-info { font-size: 1.5rem; margin-bottom: 10px; }
+.btn-agua {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-weight: bold;
+}
+
+/* Rutinas */
+.tabs { display: flex; gap: 5px; margin-bottom: 10px; }
+.tab-btn {
+    flex: 1;
+    padding: 10px;
+    background: #444;
+    border: none;
+    color: white;
+    border-radius: 5px;
+}
+.tab-btn.active { background: var(--primary); }
+
+.progreso-container { margin: 15px 0; }
+.barra-fondo { background: #444; height: 10px; border-radius: 5px; overflow: hidden; }
+.barra-relleno { background: var(--primary); height: 100%; width: 0%; transition: 0.3s; }
+
+/* Botón Principal */
+.btn-principal {
+    width: 100%;
+    padding: 15px;
+    background: var(--primary);
+    border: none;
+    color: black;
+    font-weight: bold;
+    border-radius: 10px;
+    font-size: 1rem;
+    margin: 20px 0;
+}
+
+/* Alertas */
+.alerta-viva {
+    background: #f39c12;
+    color: black;
+    padding: 10px;
+    border-radius: 5px;
+    margin-top: 10px;
+    text-align: center;
+}
+.cronometro-box {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+}
+
+.reloj-circular {
+    position: relative;
+    width: 120px;
+    height: 120px;
+}
+
+.reloj-circular svg {
+    width: 120px;
+    height: 120px;
+    transform: rotate(-90deg);
+}
+
+.reloj-circular circle {
+    fill: none;
+    stroke: #444;
+    stroke-width: 5;
+}
+
+#progresoReloj {
+    stroke: var(--primary);
+    stroke-dasharray: 283;
+    stroke-dashoffset: 283;
+    transition: stroke-dashoffset 1s linear;
+}
+
+.tiempo {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.2rem;
+    color: var(--primary);
+}
+
+.controles-timer {
+    display: flex;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.btn-play {
+    background: var(--primary);
+    color: black;
+    border: none;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    font-size: 1.2rem;
+}
+/* --- BOTÓN WHATSAPP FLOTANTE --- */
+.whatsapp-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #25d366;
+    color: white;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    text-decoration: none;
+    transition: transform 0.3s ease;
+}
+
+.whatsapp-btn:active {
+    transform: scale(0.9);
+}
+
+.tooltip-wa {
+    position: absolute;
+    right: 70px;
+    background: #333;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-family: 'Orbitron', sans-serif;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.whatsapp-btn:hover .tooltip-wa {
+    opacity: 1;
+}

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Zapala Fitness Pro - Python Powered</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+	<link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2ecc71">
+</head>
+<body>
+    <div class="app-container">
+        
+        <header class="header">
+            <div class="logo-area">
+                <i class="fas fa-bolt"></i>
+                <h1>ZAPALA<span>FIT</span></h1>
+            </div>
+            <button id="btnLogout" class="btn-standby">
+                <i class="fas fa-power-off"></i> STANDBY
+            </button>
+        </header>
+
+        <div id="alertaRegistro" class="alerta-viva" style="display:none;">
+            <i class="fas fa-bell"></i> ¡Pendiente: Registrá tu peso hoy!
+        </div>
+
+        <section class="card stats-card">
+            <div class="card-title"><i class="fas fa-calculator"></i> Bio-Métricas</div>
+            <div class="input-grid">
+                <div class="input-group">
+                    <label>Género</label>
+                    <select id="sexo">
+                        <option value="H">Hombre</option>
+                        <option value="M">Mujer</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Edad</label>
+                    <input type="number" id="edad" value="42">
+                </div>
+                <div class="input-group">
+                    <label>Peso (kg)</label>
+                    <input type="number" id="peso" placeholder="0.0" step="0.1">
+                </div>
+                <div class="input-group">
+                    <label>Altura (cm)</label>
+                    <input type="number" id="altura" placeholder="170">
+                </div>
+            </div>
+
+            <div class="input-group full-width" style="margin-top: 15px;">
+                <label>Nivel de Actividad Física</label>
+                <select id="actividad">
+                    <option value="1.2">Sedentario (Oficina / Vigilancia)</option>
+                    <option value="1.375">Ligero (1-3 días de entreno)</option>
+                    <option value="1.55">Moderado (3-5 días de entreno)</option>
+                    <option value="1.725">Fuerte (6-7 días de entreno)</option>
+                </select>
+            </div>
+
+            <div class="input-group full-width" style="margin-top: 15px;">
+                <label>Objetivo: Quema de Grasa / Semana</label>
+                <select id="intensidadDeficit">
+                    <option value="0.10">Mantenimiento (Recomposición)</option>
+                    <option value="0.15">Suave (0.3 kg / semana)</option>
+                    <option value="0.20" selected>Moderado (0.5 kg / semana)</option>
+                    <option value="0.25">Agresivo (0.7 kg / semana)</option>
+                </select>
+            </div>
+
+            <div class="results-row">
+                <div class="res-box">
+                    <span id="imcBadge">--</span>
+                    <small>IMC</small>
+                </div>
+                <div class="res-box highlight">
+                    <span id="calObj">-- kcal</span>
+                    <small>Meta Diaria</small>
+                </div>
+            </div>
+        </section>
+
+        <section class="card semana-card">
+            <div class="card-title"><i class="fas fa-calendar-check"></i> Plan de Progresión</div>
+            <select id="selectSemana" onchange="window.cambiarSemana(this.value)">
+                {% for i in range(1, 17) %}
+                <option value="{{ i }}">Etapa: Semana {{ i }}</option>
+                {% endfor %}
+            </select>
+        </section>
+
+        <section class="card agua-card">
+            <div class="agua-flex">
+                <div class="agua-text">
+                    <i class="fas fa-glass-water"></i>
+                    <span id="aguaContador">0 L</span>
+                </div>
+                <button class="btn-agua" onclick="window.sumarAgua()">
+                    <i class="fas fa-plus"></i> 250ml
+                </button>
+            </div>
+            <div class="agua-meta">Meta Zapala: 2.5L / 3L</div>
+        </section>
+
+        <section class="rutina-container">
+            <div class="tabs">
+                <button id="tabFuerza" class="tab-btn active" onclick="window.renderRutina('fuerza')">FUERZA</button>
+                <button id="tabCardio" class="tab-btn" onclick="window.renderRutina('cardio')">CARDIO</button>
+            </div>
+            
+            <div class="progreso-wrapper">
+                <div class="barra-fondo">
+                    <div id="barraRelleno" class="barra-relleno"></div>
+                </div>
+                <span id="porcentajeProgreso">0%</span>
+            </div>
+<div class="cronometro-box card">
+    <div class="reloj-circular">
+        <svg>
+            <circle cx="50" cy="50" r="45"></circle>
+            <circle id="progresoReloj" cx="50" cy="50" r="45"></circle>
+        </svg>
+        <div class="tiempo" id="timerDisplay">00:30</div>
+    </div>
+    <div class="controles-timer">
+        <button onclick="window.ajustarTimer(-10)">-10s</button>
+        <button id="btnStartTimer" onclick="window.toggleTimer()" class="btn-play"><i class="fas fa-play"></i></button>
+        <button onclick="window.ajustarTimer(10)">+10s</button>
+    </div>
+</div>
+            <div id="listaEjercicios" class="lista-ejercicios">
+                </div>
+        </section>
+
+        <button id="btnGuardar" class="btn-principal">
+            <i class="fas fa-rocket"></i> FINALIZAR Y ENVIAR REPORTE
+        </button>
+
+        <section class="card historial-card">
+            <div class="card-title"><i class="fas fa-history"></i> Historial Reciente</div>
+            <div id="listaHistorial" class="lista-historial">
+                </div>
+        </section>
+
+    </div>
+
+    <script type="module" src="{{ url_for('static', filename='js/scripts.js') }}"></script>
+	<a href="https://wa.me/5492974802505?text=Hola!%20Tengo%20una%20consulta%20sobre%20el%20plan%20ZapalaFit" 
+   class="whatsapp-btn" 
+   target="_blank">
+    <i class="fab fa-whatsapp"></i>
+    <span class="tooltip-wa">Contacto</span>
+</a>
+</body>
+</html>
